@@ -1,93 +1,138 @@
 import streamlit as st
 import logging
 from utils import *
+from template_utils import *
 
 logging.basicConfig(level=logging.DEBUG)
+st.set_option('deprecation.showfileUploaderEncoding', False)
+
 
 logger = logging.getLogger(__name__)
 
 st.set_page_config(layout="wide")
 
+if 'webbot_id' not in st.session_state:
+    st.session_state['webbot_id'] = 0
 
-if 'prompt' not in st.session_state:
-    st.session_state['prompt'] = "Please click the get prompt button to get a prompt"
+# Session State Instruction
+if "instruction" not in st.session_state:
+    # st.session_state["instruction"] = "Please click the get instruction button to get a instruction"
+    st.session_state["instruction"] = ""
 
-options = st.multiselect(
-    'Configurations',
-    ['GPT-3', 'GPT-3.5', 'GPT-4', 'knowledge with prompt', '50', '100', '200'])
-
-text = "you selected " + ":red" + str(options) + ""
-st.caption(text)
-
-form = st.form("PlanForm",clear_on_submit=True)
-
+#Session State Submitted
 if 'submitted' not in st.session_state:
     st.session_state['submitted'] = False
 
-st.session_state['submitted'] = form.form_submit_button("⚙️ Click to Generate Plan")
-form_input = form.text_input("Enter your Description of Plan", key="plan_input", value = st.session_state['prompt'])
+
+system_prompt_list = get_templates(template_type="system_message")
+user_prompt_list = get_templates(template_type="user_message")
+names = [prompt['name'] for prompt in system_prompt_list]
+ids = [prompt['id'] for prompt in system_prompt_list]
+st.session_state['system_prompt_dict'] = dict(zip(names,ids))
+
+#instructionForm
+with st.form("InstructionForm",clear_on_submit=True):
+    # form_columns = st.columns(3,gap="large")
+    # with form_columns[0]:
+    #     st.session_state['submitted'] = st.form_submit_button("⚙️ Click to Generate Completion")
+    # with form_columns[1]:
+    #     st.form_submit_button("⏭️ Next")
+    form_input = st.text_input("Enter Instruction", key="instruction_input", value = st.session_state['instruction'])
+  
+    
+    system_template =  st.multiselect('Select System Prompts',names)
+    user_template =  st.multiselect('Select User Prompts',user_prompt_list)
+    form_columns = st.columns(3,gap="large")
+    with form_columns[0]:
+        st.session_state['submitted'] = st.form_submit_button("⚙️ Click to Generate Completion")
+
+if (st.session_state['submitted'] and form_input != "" and system_template != []) :
+    system_template_ids = [st.session_state['system_prompt_dict'][name] for name in system_template]
+    completions, ground_truth_answer, retrievals = create_completions(form_input,system_template_ids)
+    st.session_state['completion1'] = completions[0]
+    st.session_state['completion2'] = completions[1]
+    st.session_state['retrieval'] = retrievals
+    st.session_state['groundtruth'] = ground_truth_answer
+    st.success("Completion Generated")
+    st.session_state['submitted'] = False
 
 
-if 'response' not in st.session_state:
-    st.session_state['response'] = "Please generate a Plan above"
 
-if (st.session_state['submitted'] and form_input != "") :
-    send_to_api({"plan":form_input})
-    st.session_state['response'] = get_from_api()
+
+#Session State Completion1
+if 'completion1' not in st.session_state:
+    st.session_state['completion1']= {"assistant_message" : "Please generate a Completion above"}
+
 elif (st.session_state['submitted'] and form_input == ""):
     st.error("Please describe your plan before clicking submit")
 
+#Session State Completion2
+if 'completion2' not in st.session_state:
+    st.session_state['completion2']= {"assistant_message" : "Please generate a Completion above"}
+
+elif (st.session_state['submitted'] and form_input == ""):
+    st.error("Please describe your plan before clicking submit")
+
+#Session State Retrieval
+if 'retrieval' not in st.session_state:
+    st.session_state['retrieval'] = "Please generate a Completion above"
+elif (st.session_state['submitted'] and form_input == ""):
+    st.error("Please describe your plan before clicking submit")
+
+#Session State GroundTruth
+if 'groundtruth' not in st.session_state:
+    st.session_state['groundtruth'] = "Please generate a Completion above"
+elif (st.session_state['submitted'] and form_input == ""):
+    st.error("Please describe your plan before clicking submit")
+
+# st.session_state['completion1'] = 'Completion1Demo'
+# st.session_state['completion2'] = 'Completion2Demo'
+# st.session_state['retrieval'] = 'retrievalDemo'
+# st.session_state['retrieval'] = 'GroundtruthDemo'
+
 #Showing Plan Part 
-if st.session_state['response']:
-    with st.form("Plans",clear_on_submit=False):
-        # col_1,col_2 = st.columns(2,gap="large")
-        # with col_1:
-        #     executed = st.form_submit_button("🔥 Click to Execute", on_click=update_state,)
-        # if (executed and ((st.session_state['response'] != "Please generate a Plan above") and 
-        #                   (st.session_state['response'] != "Please generate a Plan above test"))):
-        #     exectute_plan()
-        #     st.session_state['response'] += "\n\n Plan is exectuted"
-        # elif executed:
-        #     st.session_state['response'] = "Please generate a Plan above test"
-        # with col_2:
-        #     changed = st.form_submit_button("👎 Change a new Plan")
-        # if (changed and ((st.session_state['response'] != "Please generate a Plan above") and 
-        #                   (st.session_state['response'] != "Please generate a Plan above test"))):
-        #     st.session_state['response'] = update_from_api()
-        st.session_state['response'] = 'Log in to Brightspace using your credentials. \n From the Brightspace homepage, click on the "Course Admin\" button located in the top right corner of the page.Click on the \"Course Offering Information\" option from the list of options.Locate the course you wish to activate, and click on the \"Edit Course\" link next to the course name.On the Edit Course page, scroll down to the \"Course Offering Information\" section.In the \"Status\" drop-down menu, select \"Active\".Click on the \"Save and Close\" button at the bottom of the page.'
-        text_col1, text_col2 = st.columns(2)
-        with text_col1:
-            # text_col1 = st.text_area("Here is your plan:", key="code_input1",value = st.session_state['response'], height=300   )
-            columns = st.columns(5,gap="large")
-            with columns[0]:
-                executed = st.form_submit_button("🔥 ", on_click=update_state,)
-            if (executed and ((st.session_state['response'] != "Please generate a Plan above") and 
-                            (st.session_state['response'] != "Please generate a Plan above test"))):
-                exectute_plan()
-                st.session_state['response'] += "\n\n Plan is exectuted"
-            elif executed:
-                st.session_state['response'] = "Please generate a Plan above test"
-            with columns[4]:
-                changed = st.form_submit_button("👎 ")
-            if (changed and ((st.session_state['response'] != "Please generate a Plan above") and 
-                            (st.session_state['response'] != "Please generate a Plan above test"))):
-                st.session_state['response'] = update_from_api()
-                
-            text_col1 = st.text_area("Here is your plan:", key="code_input1",value = st.session_state['response'], height=300   )
+if st.session_state['completion1']:
+    with st.form("Plans",clear_on_submit=True):
 
-        # text_col2 = st.text_area("Here is your plan:", key="code_input2",value = st.session_state['response'], height=50   )
-        # text_col3 = st.text_area("Here is your plan:", key="code_input3",value = st.session_state['response'], height=50   )
-        # text_col4 = st.text_area("Here is your plan:", key="code_input4",value = st.session_state['response'], height=50   )
-        with text_col2:
-            col_1,col_2 = st.columns(2,gap="large")
-            with col_1:
-                st.write("")
-                st.write("")
-                st.write("")
-                # st.write("")
-                st.write("")
-            text_col2 = st.text_area("Here groundtruth:", key="code_input2",value = st.session_state['response'], height=300   )
+        # st.session_state['evaluated'] = st.form_submit_button("✅ Submit the Evaluation")
+        
+        generated_response, groundtruth_prompt = st.columns(2)
+        with generated_response:
+            completion1_rating = st.slider('Rate Completion1',min_value=1, max_value=10, step=1,value=st.session_state.get("completion_1_rating", 5), key="completion1_rating")
+            generated_response = st.text_area("Completion1:", key="generated_response",value = st.session_state['completion1']['assistant_message'], height=200   )
 
-st.session_state['response'] = st.session_state['response'].replace("\n\n Plan is exectuted", "")
-st.write(st.session_state['response'])
+            completion2_rating = st.slider('Rate Completion2',min_value=1, max_value=10, step=1,value=st.session_state.get("completion_2_rating", 5), key='completion2_rating')
+            generated_response2 = st.text_area("Completion2:", key="generated_response2",value = st.session_state['completion2']['assistant_message'], height=200   )
+
+        with groundtruth_prompt:
+            
+            groundtruth_prompt = st.text_area("Groundtruth:", key="groundtruth_prompt",value = st.session_state['groundtruth'], height=300   )
+            retrieval_rating = st.slider('Rate Retrieval',min_value=1, max_value=10, step=1,value=st.session_state.get("context_retrieval_rating", 5), key='retrieval_rating')
+            retrieval_prompt = st.text_area("Retrieval:", key="retrieval_prompt",value = st.session_state['retrieval'], height=200   )
+        
+        st.session_state['evaluated'] = st.form_submit_button("✅ Submit the Evaluation")
+
+#Sanity Check
+# completion1_rating,completion2_rating,retrieval_rating
+# st.write('completion1_rating:', completion1_rating)
+# st.write('completion2_rating:', completion2_rating)
+# st.write('retrieval_rating:', retrieval_rating)
+# st.write('groundtruth',groundtruth_prompt)
+# st.write(st.session_state['groundtruth'])
+# st.session_state['response'] = st.session_state['response'].replace("\n\n Plan is exectuted", "")
+# st.write(st.session_state['response'])
 st.sidebar.title("PlanGPT")
+
+if st.session_state['evaluated'] :
+    # st.write(st.session_state['completion1'])
+    create_evaluation(st.session_state['completion1']['id'], completion1_rating,retrieval_rating)
+    update_ground_truth(st.session_state['completion1']['id'], groundtruth_prompt)
+    create_evaluation(st.session_state['completion2']['id'], completion2_rating,retrieval_rating)
+    update_ground_truth(st.session_state['completion2']['id'], groundtruth_prompt)
+    st.session_state['completion_1_rating'] = completion1_rating
+    st.session_state['completion_2_rating'] = completion2_rating
+    st.session_state['context_retrieval_rating'] = retrieval_rating
+    st.success("Evaluation Submitted")
+    st.session_state['evaluated'] = False
+
+
