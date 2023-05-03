@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 st.set_page_config(layout="wide")
 
 if 'webbot_id' not in st.session_state:
-    st.session_state['webbot_id'] = 0
+    st.session_state['webbot_id'] = WEBBOT_ID
 
 # Session State Instruction
 if "instruction" not in st.session_state:

@@ -58,7 +58,7 @@ def create_completions(instruction,system_message_template_ids, webbot_id=config
     for template_id in template_ids:
     
         payload = {
-                    "webbot_id": 0,
+                    "webbot_id": webbot_id,
                     "conversation_id": 0,
                     "system_message_template_id": template_id,
                     "user_message": instruction,
